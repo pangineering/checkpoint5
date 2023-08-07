@@ -1,0 +1,13 @@
+<?xml version="1.0"?>
+<!DOCTYPE launch SYSTEM "http://www.ros.org/dtd/ros2launch.dtd">
+<launch>
+
+  <!-- Start the obstacle avoidance node -->
+  <node
+    name="obstacle_avoidance_node"
+    pkg="attach_shelf"
+    output="screen"
+    exec="obstacle_avoidance"
+  />
+
+</launch>

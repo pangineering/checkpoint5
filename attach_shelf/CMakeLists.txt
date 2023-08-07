@@ -9,7 +9,22 @@ endif()
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(geometry_msgs REQUIRED)
+find_package(sensor_msgs REQUIRED)
 
+
+
+add_executable(obstacle_avoidance src/pre_approach.cpp)
+ament_target_dependencies(obstacle_avoidance rclcpp sensor_msgs geometry_msgs)
+
+install(TARGETS
+  obstacle_avoidance
+  DESTINATION lib/${PROJECT_NAME}
+)
+
+install(DIRECTORY
+  launch
+  DESTINATION share/${PROJECT_NAME}/
+)
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
   # the following line skips the linter which checks for copyrights
