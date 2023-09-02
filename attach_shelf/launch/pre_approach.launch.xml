@@ -1,13 +1,19 @@
-<?xml version="1.0"?>
-<!DOCTYPE launch SYSTEM "http://www.ros.org/dtd/ros2launch.dtd">
+
 <launch>
 
-  <!-- Start the obstacle avoidance node -->
-  <node
-    name="obstacle_avoidance_node"
-    pkg="attach_shelf"
-    output="screen"
-    exec="obstacle_avoidance"
-  />
+    <!-- Define arguments for obstacle and degrees -->
+    <arg name="obstacle" default="0.0"/>
+    <arg name="degrees" default="0.0"/>
+
+    <!-- Start the obstacle avoidance node -->
+    <node
+        name="obstacle_avoidance_node"
+        pkg="attach_shelf"
+        exec="obstacle_avoidance"
+        output="screen">
+        <!-- Pass the obstacle and degrees arguments as parameters to the node -->
+        <param name="obstacle" value="$(var obstacle)"/>
+        <param name="degrees" value="$(var degrees)"/>
+    </node>
 
 </launch>

@@ -1,14 +1,12 @@
 #include "geometry_msgs/msg/twist.hpp"
 #include "rclcpp/rclcpp.hpp"
 #include "sensor_msgs/msg/laser_scan.hpp"
+#include "std_srvs/srv/trigger.hpp" // Include the header for the Trigger service
 #include <cmath>
 
 class ObstacleAvoidanceNode : public rclcpp::Node {
 public:
-  ObstacleAvoidanceNode(double obstacle_distance, double degrees)
-      : Node("obstacle_avoidance_node"), obstacle_distance_(obstacle_distance),
-        degrees_(degrees) {
-
+  ObstacleAvoidanceNode() : Node("obstacle_avoidance_node") {
     // Subscribe to the /scan topic
     scan_subscriber_ = this->create_subscription<sensor_msgs::msg::LaserScan>(
         "/scan", 10,
@@ -18,7 +16,8 @@ public:
     // Publish to the /robot/cmd_vel topic
     cmd_vel_publisher_ =
         this->create_publisher<geometry_msgs::msg::Twist>("/robot/cmd_vel", 10);
-
+    approach_shelf_client_ =
+        this->create_client<std_srvs::srv::Trigger>("/approach_shelf");
     // Set the linear velocity to move the robot forward
     linear_velocity_ =
         0.2; // You can adjust this value to your desired velocity
@@ -27,6 +26,26 @@ public:
   }
 
 private:
+  void callApproachShelfService() {
+    auto request = std::make_shared<std_srvs::srv::Trigger::Request>();
+    auto future = approach_shelf_client_->async_send_request(request);
+
+    // Wait for the response from the service
+    rclcpp::spin_until_future_complete(this->get_node_base_interface(), future);
+    if (future.wait_for(std::chrono::seconds(1)) == std::future_status::ready) {
+      if (future.get()->success) {
+        RCLCPP_INFO(this->get_logger(),
+                    "Approach to shelf triggered successfully.");
+      } else {
+        RCLCPP_ERROR(this->get_logger(),
+                     "Failed to trigger approach to shelf.");
+      }
+    } else {
+      RCLCPP_ERROR(this->get_logger(),
+                   "Service call to approach_shelf timed out.");
+    }
+  }
+
   void scanCallback(const sensor_msgs::msg::LaserScan::SharedPtr scan) {
     // Find the minimum distance in the laser scan data
     float min_distance = std::numeric_limits<float>::infinity();
@@ -61,34 +80,15 @@ private:
 
   rclcpp::Subscription<sensor_msgs::msg::LaserScan>::SharedPtr scan_subscriber_;
   rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr cmd_vel_publisher_;
-
+  rclcpp::Client<std_srvs::srv::Trigger>::SharedPtr approach_shelf_client_;
   float linear_velocity_;
   float angular_velocity_;
-  float obstacle_distance_; // Will be initialized from the parameter
-  float degrees_;           // Will be initialized from the parameter
+  float obstacle_distance_ = 1.0; // Set the obstacle distance (x) in meters
 };
 
 int main(int argc, char **argv) {
   rclcpp::init(argc, argv);
-
-  double obstacle_distance = 0.3; // Default value
-  double degrees = -90;           // Default value
-
-  if (argc == 3) {
-    obstacle_distance = std::stod(argv[1]);
-    degrees = std::stod(argv[2]);
-  } else {
-    RCLCPP_INFO(rclcpp::get_logger("ObstacleAvoidanceNode"),
-                "Using default parameters.");
-  }
-
-  // Create the node with overridden parameters
-  auto node =
-      std::make_shared<ObstacleAvoidanceNode>(obstacle_distance, degrees);
-
-  // Spin the node
-  rclcpp::spin(node);
-
+  rclcpp::spin(std::make_shared<ObstacleAvoidanceNode>());
   rclcpp::shutdown();
   return 0;
 }
