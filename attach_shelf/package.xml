@@ -1,5 +1,4 @@
 <?xml version="1.0"?>
-<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
   <name>attach_shelf</name>
   <version>0.0.0</version>
@@ -11,12 +10,20 @@
 
   <depend>rclcpp</depend>
   <depend>geometry_msgs</depend>
-  <depend>sensor_msgs</depend> <!-- Add this line to include the sensor_msgs dependency -->
-<build_depend>rosidl_default_generators</build_depend>
+  <!-- Keep only the relevant dependency -->
+  <exec_depend>sensor_msgs</exec_depend>
 
-<exec_depend>rosidl_default_runtime</exec_depend>
+  <build_depend>rosidl_default_generators</build_depend>
+  <exec_depend>rosidl_default_runtime</exec_depend>
+  <member_of_group>rosidl_interface_packages</member_of_group>
 
-<member_of_group>rosidl_interface_packages</member_of_group>
+  <build_depend>nav_msgs</build_depend>
+  <build_depend>sensor_msgs</build_depend>
+  <!-- Additional dependencies... -->
+  <exec_depend>nav_msgs</exec_depend>
+  <exec_depend>sensor_msgs</exec_depend>
+  <!-- Additional dependencies... -->
+
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>
 

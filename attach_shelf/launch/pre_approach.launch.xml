@@ -2,8 +2,8 @@
 <launch>
 
     <!-- Define arguments for obstacle and degrees -->
-    <arg name="obstacle" default="0.0"/>
-    <arg name="degrees" default="0.0"/>
+    <arg name="obstacle" default="0.3"/>
+    <arg name="degrees" default="-90.0"/>
 
     <!-- Start the obstacle avoidance node -->
     <node

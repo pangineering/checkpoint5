@@ -21,6 +21,8 @@ find_package(rosidl_default_generators REQUIRED)
 find_package(tf2 REQUIRED)
 find_package(tf2_ros REQUIRED)
 find_package(std_srvs REQUIRED)
+find_package(tf2_geometry_msgs REQUIRED)
+find_package(nav_msgs REQUIRED)
 
 # Generate the ROS interfaces for the project
 rosidl_generate_interfaces(${PROJECT_NAME}
@@ -30,17 +32,21 @@ rosidl_generate_interfaces(${PROJECT_NAME}
 
 # Create the executable for the obstacle avoidance node
 add_executable(obstacle_avoidance src/pre_approach.cpp)
-ament_target_dependencies(obstacle_avoidance rclcpp sensor_msgs geometry_msgs)
+ament_target_dependencies(obstacle_avoidance rclcpp sensor_msgs nav_msgs geometry_msgs   tf2
+  tf2_geometry_msgs)
+
+
 
 add_executable(pre_approach_v2 src/pre_approach_v2.cpp)
-ament_target_dependencies(pre_approach_v2 rclcpp sensor_msgs geometry_msgs std_srvs)
+ament_target_dependencies(pre_approach_v2 rclcpp sensor_msgs nav_msgs geometry_msgs   tf2
+  tf2_geometry_msgs)
 
 # Create the executable for the approach service server node
 add_executable(approach_service_server src/approach_service_server.cpp)
 ament_target_dependencies(approach_service_server
   rclcpp
  sensor_msgs
-  geometry_msgs
+ geometry_msgs
   std_srvs
   tf2_ros
   tf2
@@ -48,8 +54,9 @@ ament_target_dependencies(approach_service_server
 
 # Link against the typesupport library
 rosidl_target_interfaces(approach_service_server
-  ${PROJECT_NAME} "rosidl_typesupport_cpp")
-
+ ${PROJECT_NAME} "rosidl_typesupport_cpp")
+rosidl_target_interfaces(pre_approach_v2
+ ${PROJECT_NAME} "rosidl_typesupport_cpp")
 # Install the executables and other files
 install(TARGETS
   obstacle_avoidance
