@@ -12,7 +12,7 @@ public:
                         bool final_approach)
       : Node("obstacle_avoidance_node"), obstacle_distance_(obstacle_distance),
         degrees_(degrees), stop_rotation_(false), aligning_to_shelf_(false),
-        task_done_(false), final_approach_(final_approach) {
+        task_done_(false), yaw_(0.0), final_approach_(final_approach) {
 
     // Subscribe to the /scan topic
     scan_subscriber_ = this->create_subscription<sensor_msgs::msg::LaserScan>(
@@ -40,37 +40,10 @@ public:
         std::bind(&ObstacleAvoidanceNode::timerCallback, this));
 
     approach_shelf_client_ =
-        this->create_client<attach_shelf::srv::GoToLoading>("/approach_shelf");
+        this->create_client<attach_shelf::srv::GoToLoading>("/go_to_loading");
   }
 
 private:
-  void callApproachShelfService() {
-    // Create a request message and populate it with the 'final_approach_'
-    // parameter
-    auto request = std::make_shared<attach_shelf::srv::GoToLoading::Request>();
-    request->attach_to_shelf = final_approach_;
-    RCLCPP_INFO(this->get_logger(), "Final Approach: %s",
-                final_approach_ ? "true"
-                                : "false"); // Call the /go_to_loading service
-    auto result_future = approach_shelf_client_->async_send_request(request);
-    RCLCPP_INFO(this->get_logger(), "Service call initiated");
-
-    // Spin to allow the service request to be sent
-    // rclcpp::spin_some(this->get_node_base_interface());
-
-    // Wait for the service call result
-    if (rclcpp::spin_until_future_complete(this->get_node_base_interface(),
-                                           result_future) ==
-        rclcpp::FutureReturnCode::SUCCESS) {
-      // Service call succeeded
-      RCLCPP_INFO(this->get_logger(),
-                  "Service call to go_to_loading succeeded");
-    } else {
-      // Service call failed
-      RCLCPP_ERROR(this->get_logger(), "Service call to go_to_loading failed");
-    }
-  }
-
   void scanCallback(const sensor_msgs::msg::LaserScan::SharedPtr scan) {
     // Find the minimum distance in the laser scan data
     float min_distance = std::numeric_limits<float>::infinity();
@@ -86,40 +59,25 @@ private:
         }
       }
     }
-    // Log the obstacle distance value
-    RCLCPP_INFO(this->get_logger(), "Obstacle Distance: %f",
-                obstacle_distance_);
-
     // Convert degrees to radians
     double degrees_in_radians = degrees_ * M_PI / 180.0;
-
     if (min_distance <= obstacle_distance_ && !stop_rotation_) {
       // Obstacle detected, switch to aligning_to_shelf_ mode
       aligning_to_shelf_ = true;
       stop_rotation_ = true; // Stop rotating
-      RCLCPP_INFO(this->get_logger(), "Task Done: %s",
-                  task_done_ ? "true" : "false");
+
       // Stop the robot and align to the shelf
       stopRobot();
       alignToShelf();
-      RCLCPP_INFO(this->get_logger(), "Task Done: %s",
-                  task_done_ ? "true" : "false");
-
     } else if (aligning_to_shelf_ &&
                std::abs(yaw_ - degrees_in_radians) > 0.05) {
       // Continue aligning to the shelf until the desired angle is reached
       RCLCPP_INFO(this->get_logger(), "Degree angle: %f", degrees_);
       alignToShelf();
-      RCLCPP_INFO(this->get_logger(), "Task Done: %s",
-                  task_done_ ? "true" : "false");
     } else if (!stop_rotation_ && !task_done_) {
-      // If the robot is not already stopped and not aligning to the shelf,
-      // move it forward
+      // If the robot is not already stopped and not aligning to the shelf, move
+      // it forward
       moveRobotForward();
-    } else if (task_done_) {
-      RCLCPP_INFO(this->get_logger(), "Task Done: %s", "true");
-      stopRobot();
-      callApproachShelfService();
     }
   }
 
@@ -180,16 +138,12 @@ private:
     double angle_difference = std::abs(yaw_ - degrees_in_radians);
     RCLCPP_INFO(this->get_logger(), "difference angle: %f", angle_difference);
 
-    if (angle_difference > 0.058) {
+    if (angle_difference > 0.05) {
       // Continue rotating towards the desired angle
-      twist.angular.z = (degrees_in_radians > yaw_) ? 0.1 : -0.1;
+      twist.angular.z = (degrees_in_radians > yaw_) ? 0.2 : -0.2;
     } else {
       // If the desired angle is reached (within a tolerance), stop rotation
       twist.angular.z = 0.0;
-      RCLCPP_INFO(
-          this->get_logger(),
-          "the desired angle is reached (within a tolerance), stop rotation");
-
       aligning_to_shelf_ = false;
       stop_rotation_ = false;
       task_done_ = true;
@@ -197,7 +151,25 @@ private:
 
     cmd_vel_publisher_->publish(twist);
   }
+  void callApproachShelfService() {
+    // Create a request message and populate it with data if needed
+    auto request = std::make_shared<attach_shelf::srv::GoToLoading::Request>();
 
+    // Call the /go_to_loading service
+    auto result_future = approach_shelf_client_->async_send_request(request);
+
+    // Wait for the service call result
+    if (rclcpp::spin_until_future_complete(this->get_node_base_interface(),
+                                           result_future) ==
+        rclcpp::FutureReturnCode::SUCCESS) {
+      // Service call succeeded
+      RCLCPP_INFO(this->get_logger(),
+                  "Service call to go_to_loading succeeded");
+    } else {
+      // Service call failed
+      RCLCPP_ERROR(this->get_logger(), "Service call to go_to_loading failed");
+    }
+  }
   rclcpp::Subscription<sensor_msgs::msg::LaserScan>::SharedPtr scan_subscriber_;
   rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odometry_subscriber_;
   rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr cmd_vel_publisher_;
@@ -210,9 +182,9 @@ private:
   bool task_done_;
   double yaw_;
   bool final_approach_;
+  rclcpp::TimerBase::SharedPtr timer_;
   rclcpp::Client<attach_shelf::srv::GoToLoading>::SharedPtr
       approach_shelf_client_;
-  rclcpp::TimerBase::SharedPtr timer_;
 };
 
 int main(int argc, char **argv) {
@@ -222,10 +194,8 @@ int main(int argc, char **argv) {
   auto node = std::make_shared<rclcpp::Node>("obstacle_avoidance_node");
 
   // Declare parameters and their default values
-
-  // Declare parameters and their default values
-  double obstacle_distance = 0.3; // Default value
-  double degrees = -90.0;         // Default value
+  double obstacle_distance = 0.5; // Default value
+  double degrees = 0.0;           // Default value
   bool final_approach = false;    // Default value
 
   // Declare parameters with default values

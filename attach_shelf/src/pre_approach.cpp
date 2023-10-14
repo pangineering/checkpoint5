@@ -54,7 +54,8 @@ private:
         }
       }
     }
-
+    // Convert degrees to radians
+    double degrees_in_radians = degrees_ * M_PI / 180.0;
     if (min_distance <= obstacle_distance_ && !stop_rotation_) {
       // Obstacle detected, switch to aligning_to_shelf_ mode
       aligning_to_shelf_ = true;
@@ -63,8 +64,10 @@ private:
       // Stop the robot and align to the shelf
       stopRobot();
       alignToShelf();
-    } else if (aligning_to_shelf_ && std::abs(yaw_ - degrees_) > 0.05) {
+    } else if (aligning_to_shelf_ &&
+               std::abs(yaw_ - degrees_in_radians) > 0.05) {
       // Continue aligning to the shelf until the desired angle is reached
+      RCLCPP_INFO(this->get_logger(), "Degree angle: %f", degrees_);
       alignToShelf();
     } else if (!stop_rotation_ && !task_done_) {
       // If the robot is not already stopped and not aligning to the shelf, move
@@ -121,8 +124,9 @@ private:
 
     // Convert degrees to radians
     double degrees_in_radians = degrees_ * M_PI / 180.0;
-
-    RCLCPP_INFO(this->get_logger(), "Degree angle: %f", degrees_in_radians);
+    RCLCPP_INFO(this->get_logger(), "Degree angle: %f", degrees_);
+    RCLCPP_INFO(this->get_logger(), "Degree angle (Radian): %f",
+                degrees_in_radians);
 
     // Calculate the absolute difference between the current yaw angle and the
     // desired angle
@@ -157,22 +161,24 @@ private:
   rclcpp::TimerBase::SharedPtr timer_;
 };
 
+
 int main(int argc, char **argv) {
   rclcpp::init(argc, argv);
-
-  double obstacle_distance = 0.3; // Default value
-  double degrees = -90.0;         // Default value
 
   // Create a node
   auto node = std::make_shared<rclcpp::Node>("obstacle_avoidance_node");
 
-  // Get parameter values from the command-line arguments
-  if (node->has_parameter("obstacle")) {
-    node->get_parameter("obstacle", obstacle_distance);
-  }
-  if (node->has_parameter("degrees")) {
-    node->get_parameter("degrees", degrees);
-  }
+  // Declare parameters and their default values
+  double obstacle_distance = 0.3; // Default value
+  double degrees = -90.0;         // Default value
+
+  // Declare parameters with default values
+  node->declare_parameter("obstacle", obstacle_distance);
+  node->declare_parameter("degrees", degrees);
+
+  // Get parameter values from the launch file or command line
+  node->get_parameter("obstacle", obstacle_distance);
+  node->get_parameter("degrees", degrees);
 
   // Create the ObstacleAvoidanceNode with parameter values
   auto obstacle_avoidance_node =

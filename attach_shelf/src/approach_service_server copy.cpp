@@ -42,44 +42,26 @@ private:
           response) {
     // Check if the laser detected the shelf legs
     if (laser_detected_legs_) {
-      RCLCPP_INFO(this->get_logger(), "attach_to_shelf: %s",
-                  request->attach_to_shelf ? "true" : "false");
       // Check if the service should do the final approach
       if (request->attach_to_shelf) {
-        // Perform the final approach logic
+        // Perform the final approach logic here
+        // Publish the cart_frame transform, move the robot underneath the
+        // shelf, and lift it If successful, set response->complete to true
+        // Otherwise, set response->complete to false
+        // Implement this logic according to your robot's control mechanisms
+        // You can use the tf_broadcaster_ and cmd_vel_publisher_ to achieve
+        // this
 
-        // Calculate the center point between both detected legs
-        double center_x = (leg1_x_ + leg2_x_) / 2.0;
-        double center_y = (leg1_y_ + leg2_y_) / 2.0;
+        // Example (replace with your actual logic):
+        // tf_broadcaster_->sendTransform(/* transform details */);
+        // geometry_msgs::msg::Twist cmd_vel_msg;
+        // cmd_vel_msg.linear.x = /* control command */;
+        // cmd_vel_msg.angular.z = /* control command */;
+        // cmd_vel_publisher_->publish(cmd_vel_msg);
 
-        // Publish a transform from the base frame to the cart_frame
-        geometry_msgs::msg::TransformStamped cart_transform;
-        cart_transform.header.frame_id =
-            "robot_front_laser_base_link"; // Source frame (replace with your
-                                           // robot's frame)
-        cart_transform.child_frame_id = "cart_frame"; // Target frame
-        cart_transform.transform.translation.x = center_x;
-        cart_transform.transform.translation.y = center_y;
-        cart_transform.transform.translation.z =
-            0.0; // Assuming shelf height is at the same height as the robot's
-                 // base
-        cart_transform.transform.rotation.x = 0.0;
-        cart_transform.transform.rotation.y = 0.0;
-        cart_transform.transform.rotation.z = 0.0;
-        cart_transform.transform.rotation.w = 1.0;
-        tf_broadcaster_->sendTransform(cart_transform);
+        bool final_approach_successful = true; // Replace with your logic
 
-        // Calculate the distance to move forward to be right underneath the
-        // shelf
-        double forward_distance = 0.3; // 30 cm
-
-        // Perform the robot's movement based on the transformation
-        // Assuming you have a function moveTowardsTransform that uses TF
-        // information to control the robot's movement.
-        bool movement_successful =
-            moveTowardsTransform(center_x, center_y, forward_distance);
-
-        if (movement_successful) {
+        if (final_approach_successful) {
           response->complete = true;
         } else {
           response->complete = false;
@@ -87,56 +69,20 @@ private:
       } else {
         // Only publish the cart_frame transform, do not perform the final
         // approach
+        // Set response->complete to true
+
+        // Example (replace with your actual logic):
+        // tf_broadcaster_->sendTransform(/* transform details */);
         response->complete = true;
-        RCLCPP_INFO(this->get_logger(),
-                    "Only publish the cart_frame transform, do not perform the "
-                    "final approach");
       }
     } else {
-      // Laser did not detect both shelf legs
+      // Laser did not detect shelf legs
+      // Set response->complete to false
       response->complete = false;
-      RCLCPP_INFO(this->get_logger(), "Laser did not detect both shelf legs");
     }
 
     // Avoid unused parameter warning
     (void)request_header;
-  }
-  bool moveTowardsTransform(double target_x, double target_y,
-                            double forward_distance) {
-    // Calculate the distance between the current robot position and the target
-    // position
-    double distance_to_target =
-        sqrt(pow(target_x - robot_x_, 2) + pow(target_y - robot_y_, 2));
-
-    // Calculate the angle to the target position
-    double angle_to_target = atan2(target_y - robot_y_, target_x - robot_x_);
-
-    // Adjust the robot's orientation towards the target (e.g., turn the robot)
-    // Implement your robot's control mechanisms to adjust its orientation
-
-    // Move the robot forward while maintaining the adjusted orientation
-    geometry_msgs::msg::Twist cmd_vel_msg;
-    cmd_vel_msg.linear.x = 0.2; // Example linear velocity for forward motion
-
-    // Publish the Twist message to control the robot's movement
-    cmd_vel_publisher_->publish(cmd_vel_msg);
-
-    // Check if the robot has reached the target position
-    if (distance_to_target <= forward_distance) {
-      // Stop the robot
-      cmd_vel_msg.linear.x = 0.0;
-      cmd_vel_msg.angular.z = 0.0;
-      cmd_vel_publisher_->publish(cmd_vel_msg);
-
-      // Update the robot's position (assuming that you have odometry
-      // information)
-      robot_x_ = target_x;
-      robot_y_ = target_y;
-
-      return true; // The robot successfully reached the target position
-    }
-
-    return false; // The robot is still in transit to the target position
   }
 
   bool detectShelfLegs() {

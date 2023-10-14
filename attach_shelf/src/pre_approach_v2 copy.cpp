@@ -38,9 +38,9 @@ public:
     timer_ = this->create_wall_timer(
         std::chrono::milliseconds(100),
         std::bind(&ObstacleAvoidanceNode::timerCallback, this));
-
+    // Create a service client to call the /go_to_loading service
     approach_shelf_client_ =
-        this->create_client<attach_shelf::srv::GoToLoading>("/approach_shelf");
+        this->create_client<attach_shelf::srv::GoToLoading>("/go_to_loading");
   }
 
 private:
@@ -53,10 +53,6 @@ private:
                 final_approach_ ? "true"
                                 : "false"); // Call the /go_to_loading service
     auto result_future = approach_shelf_client_->async_send_request(request);
-    RCLCPP_INFO(this->get_logger(), "Service call initiated");
-
-    // Spin to allow the service request to be sent
-    // rclcpp::spin_some(this->get_node_base_interface());
 
     // Wait for the service call result
     if (rclcpp::spin_until_future_complete(this->get_node_base_interface(),
@@ -70,7 +66,6 @@ private:
       RCLCPP_ERROR(this->get_logger(), "Service call to go_to_loading failed");
     }
   }
-
   void scanCallback(const sensor_msgs::msg::LaserScan::SharedPtr scan) {
     // Find the minimum distance in the laser scan data
     float min_distance = std::numeric_limits<float>::infinity();
@@ -92,7 +87,6 @@ private:
 
     // Convert degrees to radians
     double degrees_in_radians = degrees_ * M_PI / 180.0;
-
     if (min_distance <= obstacle_distance_ && !stop_rotation_) {
       // Obstacle detected, switch to aligning_to_shelf_ mode
       aligning_to_shelf_ = true;
@@ -113,13 +107,14 @@ private:
       RCLCPP_INFO(this->get_logger(), "Task Done: %s",
                   task_done_ ? "true" : "false");
     } else if (!stop_rotation_ && !task_done_) {
-      // If the robot is not already stopped and not aligning to the shelf,
-      // move it forward
+      // If the robot is not already stopped and not aligning to the shelf, move
+      // it forward
       moveRobotForward();
     } else if (task_done_) {
-      RCLCPP_INFO(this->get_logger(), "Task Done: %s", "true");
+      RCLCPP_INFO(this->get_logger(), "Task Done: %s",
+                  task_done_ ? "true" : "false");
+      stop_rotation_ = true;
       stopRobot();
-      callApproachShelfService();
     }
   }
 
@@ -180,16 +175,12 @@ private:
     double angle_difference = std::abs(yaw_ - degrees_in_radians);
     RCLCPP_INFO(this->get_logger(), "difference angle: %f", angle_difference);
 
-    if (angle_difference > 0.058) {
+    if (angle_difference > 0.05) {
       // Continue rotating towards the desired angle
-      twist.angular.z = (degrees_in_radians > yaw_) ? 0.1 : -0.1;
+      twist.angular.z = (degrees_in_radians > yaw_) ? 0.2 : -0.2;
     } else {
       // If the desired angle is reached (within a tolerance), stop rotation
       twist.angular.z = 0.0;
-      RCLCPP_INFO(
-          this->get_logger(),
-          "the desired angle is reached (within a tolerance), stop rotation");
-
       aligning_to_shelf_ = false;
       stop_rotation_ = false;
       task_done_ = true;
