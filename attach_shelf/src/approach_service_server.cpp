@@ -4,6 +4,7 @@
 #include "nav_msgs/msg/odometry.hpp"
 #include "rclcpp/rclcpp.hpp"
 #include "sensor_msgs/msg/laser_scan.hpp"
+#include "std_msgs/msg/empty.hpp"
 #include "tf2/LinearMath/Quaternion.h"
 #include "tf2_geometry_msgs/tf2_geometry_msgs.h" // Include this for quaternion conversion
 #include "tf2_ros/transform_broadcaster.h"
@@ -35,6 +36,8 @@ public:
 
     // Initialize latest_scan_ as a null SharedPtr
     latest_scan_ = nullptr;
+    elevator_up_publisher_ =
+        this->create_publisher<std_msgs::msg::Empty>("/elevator_up", 10);
   }
 
 private:
@@ -55,8 +58,9 @@ private:
 
       // Publish a transform from the base frame to the cart_frame
       geometry_msgs::msg::TransformStamped cart_transform;
-      cart_transform.header.frame_id = "robot_base_link"; // Source frame
-      cart_transform.child_frame_id = "cart_frame";       // Target frame
+      cart_transform.header.frame_id =
+          "robot_front_laser_base_link";            // Source frame
+      cart_transform.child_frame_id = "cart_frame"; // Target frame
       cart_transform.transform.translation.x = center_x;
       cart_transform.transform.translation.y = center_y;
       cart_transform.transform.translation.z =
@@ -95,6 +99,7 @@ private:
 
         if (movement_successful) {
           response->complete = true;
+          loadShelf();
         } else {
           response->complete = false;
         }
@@ -125,6 +130,8 @@ private:
     // Calculate the angle to the target position
     double angle_to_target = atan2(target_y - robot_y_, target_x - robot_x_);
 
+    double total_distance = distance_to_target + forward_distance;
+
     // Adjust the robot's orientation towards the target (e.g., turn the robot)
     // Implement your robot's control mechanisms to adjust its orientation
 
@@ -135,22 +142,74 @@ private:
     // Publish the Twist message to control the robot's movement
     cmd_vel_publisher_->publish(cmd_vel_msg);
 
-    // Check if the robot has reached the target position
-    if (distance_to_target <= forward_distance) {
-      // Stop the robot
-      cmd_vel_msg.linear.x = 0.0;
-      cmd_vel_msg.angular.z = 0.0;
+    // Move the robot until it reaches the target position
+    while (distance_to_target > 0) {
+      // Calculate the distance to move in this step (up to a maximum of
+      // distance_to_target)
+      double step_distance =
+          std::min(0.1, distance_to_target); // Adjust step distance as needed
+
+      // Move the robot forward while maintaining the adjusted orientation
+      geometry_msgs::msg::Twist cmd_vel_msg;
+      cmd_vel_msg.linear.x = 0.2;  // Example linear velocity for forward motion
+      cmd_vel_msg.angular.z = 0.0; // Example angular velocity (no rotation)
+
+      // Publish the Twist message to control the robot's movement
       cmd_vel_publisher_->publish(cmd_vel_msg);
 
-      // Update the robot's position (assuming that you have odometry
-      // information)
-      robot_x_ = target_x;
-      robot_y_ = target_y;
+      // Update the remaining distance to the target
+      distance_to_target -= step_distance;
 
-      return true; // The robot successfully reached the target position
+      // Sleep for a short duration (you may need to adjust this)
+      rclcpp::sleep_for(
+          std::chrono::milliseconds(100)); // Example sleep duration
     }
 
-    return false; // The robot is still in transit to the target position
+    // Now the robot has reached the target position
+    // Stop the robot
+    cmd_vel_msg.linear.x = 0.0;
+    cmd_vel_msg.angular.z = 0.0;
+    cmd_vel_publisher_->publish(cmd_vel_msg);
+
+    // Update the robot's position
+    robot_x_ = target_x;
+    robot_y_ = target_y;
+
+    // Move forward by "forward_distance"
+    // ... (implement code to move forward by "forward_distance")
+
+    while (forward_distance > 0) {
+      // Calculate the distance to move in this step (up to a maximum of
+      // forward_distance)
+      double step_distance =
+          std::min(0.1, forward_distance); // Adjust step distance as needed
+
+      // Move the robot forward while maintaining the adjusted orientation
+      geometry_msgs::msg::Twist forward_cmd_vel_msg;
+      forward_cmd_vel_msg.linear.x =
+          0.2; // Example linear velocity for forward motion
+      forward_cmd_vel_msg.angular.z =
+          0.0; // Example angular velocity (no rotation)
+
+      // Publish the Twist message to control the robot's movement
+      cmd_vel_publisher_->publish(forward_cmd_vel_msg);
+
+      // Update the remaining distance to move forward
+      forward_distance -= step_distance;
+
+      // Sleep for a short duration (you may need to adjust this)
+      rclcpp::sleep_for(
+          std::chrono::milliseconds(100)); // Example sleep duration
+    }
+
+    // Stop the robot after moving forward by the desired distance
+    geometry_msgs::msg::Twist stop_cmd_vel_msg;
+    stop_cmd_vel_msg.linear.x = 0.0;
+    stop_cmd_vel_msg.angular.z = 0.0;
+    cmd_vel_publisher_->publish(stop_cmd_vel_msg);
+
+    return true; // The robot successfully moved forward by the specified
+                 // distance
   }
 
   bool detectShelfLegs() {
@@ -207,6 +266,12 @@ private:
     // Placeholder logic for demonstration purposes (replace with actual logic)
     laser_detected_legs_ = detectShelfLegs();
   }
+  void loadShelf() {
+    // Trigger the elevator up action by publishing a message to /elevator_up
+    auto elevator_up_msg = std_msgs::msg::Empty();
+    elevator_up_publisher_->publish(elevator_up_msg);
+    RCLCPP_INFO(this->get_logger(), "Triggered elevator up action.");
+  }
 
   // Member variables
   rclcpp::Service<attach_shelf::srv::GoToLoading>::SharedPtr approach_service_;
@@ -214,6 +279,7 @@ private:
       laser_subscriber_;
   std::shared_ptr<tf2_ros::TransformBroadcaster> tf_broadcaster_;
   rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr cmd_vel_publisher_;
+  rclcpp::Publisher<std_msgs::msg::Empty>::SharedPtr elevator_up_publisher_;
   double robot_x_;
   double robot_y_;
   bool laser_detected_legs_ = false;

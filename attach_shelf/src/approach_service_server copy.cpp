@@ -4,6 +4,7 @@
 #include "nav_msgs/msg/odometry.hpp"
 #include "rclcpp/rclcpp.hpp"
 #include "sensor_msgs/msg/laser_scan.hpp"
+#include "std_msgs/msg/empty.hpp"
 #include "tf2/LinearMath/Quaternion.h"
 #include "tf2_geometry_msgs/tf2_geometry_msgs.h" // Include this for quaternion conversion
 #include "tf2_ros/transform_broadcaster.h"
@@ -35,6 +36,8 @@ public:
 
     // Initialize latest_scan_ as a null SharedPtr
     latest_scan_ = nullptr;
+    elevator_up_publisher_ =
+        this->create_publisher<std_msgs::msg::Empty>("/elevator_up", 10);
   }
 
 private:
@@ -55,9 +58,8 @@ private:
 
       // Publish a transform from the base frame to the cart_frame
       geometry_msgs::msg::TransformStamped cart_transform;
-      cart_transform.header.frame_id =
-          "robot_front_laser_base_link";            // Source frame
-      cart_transform.child_frame_id = "cart_frame"; // Target frame
+      cart_transform.header.frame_id = "robot_base_link"; // Source frame
+      cart_transform.child_frame_id = "cart_frame";       // Target frame
       cart_transform.transform.translation.x = center_x;
       cart_transform.transform.translation.y = center_y;
       cart_transform.transform.translation.z =
@@ -96,6 +98,7 @@ private:
 
         if (movement_successful) {
           response->complete = true;
+          loadShelf();
         } else {
           response->complete = false;
         }
@@ -125,6 +128,8 @@ private:
 
     // Calculate the angle to the target position
     double angle_to_target = atan2(target_y - robot_y_, target_x - robot_x_);
+
+    double total_distance = distance_to_target + forward_distance;
 
     // Adjust the robot's orientation towards the target (e.g., turn the robot)
     // Implement your robot's control mechanisms to adjust its orientation
@@ -208,6 +213,12 @@ private:
     // Placeholder logic for demonstration purposes (replace with actual logic)
     laser_detected_legs_ = detectShelfLegs();
   }
+  void loadShelf() {
+    // Trigger the elevator up action by publishing a message to /elevator_up
+    auto elevator_up_msg = std_msgs::msg::Empty();
+    elevator_up_publisher_->publish(elevator_up_msg);
+    RCLCPP_INFO(this->get_logger(), "Triggered elevator up action.");
+  }
 
   // Member variables
   rclcpp::Service<attach_shelf::srv::GoToLoading>::SharedPtr approach_service_;
@@ -215,6 +226,7 @@ private:
       laser_subscriber_;
   std::shared_ptr<tf2_ros::TransformBroadcaster> tf_broadcaster_;
   rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr cmd_vel_publisher_;
+  rclcpp::Publisher<std_msgs::msg::Empty>::SharedPtr elevator_up_publisher_;
   double robot_x_;
   double robot_y_;
   bool laser_detected_legs_ = false;
