@@ -1,8 +1,11 @@
 #include "attach_shelf/srv/go_to_loading.hpp"
 #include "geometry_msgs/msg/transform_stamped.hpp"
 #include "geometry_msgs/msg/twist.hpp"
+#include "nav_msgs/msg/odometry.hpp"
 #include "rclcpp/rclcpp.hpp"
 #include "sensor_msgs/msg/laser_scan.hpp"
+#include "tf2/LinearMath/Quaternion.h"
+#include "tf2_geometry_msgs/tf2_geometry_msgs.h" // Include this for quaternion conversion
 #include "tf2_ros/transform_broadcaster.h"
 
 class ApproachServiceServer : public rclcpp::Node {
@@ -44,30 +47,41 @@ private:
     if (laser_detected_legs_) {
       RCLCPP_INFO(this->get_logger(), "attach_to_shelf: %s",
                   request->attach_to_shelf ? "true" : "false");
+      // Perform the final approach logic
+
+      // Calculate the center point between both detected legs
+      double center_x = (leg1_x_ + leg2_x_) / 2.0;
+      double center_y = (leg1_y_ + leg2_y_) / 2.0;
+
+      // Publish a transform from the base frame to the cart_frame
+      geometry_msgs::msg::TransformStamped cart_transform;
+      cart_transform.header.frame_id = "robot_base_link"; // Source frame
+      cart_transform.child_frame_id = "cart_frame";       // Target frame
+      cart_transform.transform.translation.x = center_x;
+      cart_transform.transform.translation.y = center_y;
+      cart_transform.transform.translation.z =
+          0.0; // Assuming shelf height is at the same height as the robot's
+               // base
+
+      // Convert the quaternion using tf2
+      tf2::Quaternion tf2_quat;
+      tf2_quat.setRPY(0, 0, 0); // No rotation
+      tf2::convert(tf2_quat, cart_transform.transform.rotation);
+
+      tf_broadcaster_->sendTransform(cart_transform);
+      // Debug print after sending the transform
+      RCLCPP_INFO(this->get_logger(),
+                  "After sending transform: x=%.2f, y=%.2f, z=%.2f, qx=%.2f, "
+                  "qy=%.2f, qz=%.2f, qw=%.2f",
+                  cart_transform.transform.translation.x,
+                  cart_transform.transform.translation.y,
+                  cart_transform.transform.translation.z,
+                  cart_transform.transform.rotation.x,
+                  cart_transform.transform.rotation.y,
+                  cart_transform.transform.rotation.z,
+                  cart_transform.transform.rotation.w);
       // Check if the service should do the final approach
       if (request->attach_to_shelf) {
-        // Perform the final approach logic
-
-        // Calculate the center point between both detected legs
-        double center_x = (leg1_x_ + leg2_x_) / 2.0;
-        double center_y = (leg1_y_ + leg2_y_) / 2.0;
-
-        // Publish a transform from the base frame to the cart_frame
-        geometry_msgs::msg::TransformStamped cart_transform;
-        cart_transform.header.frame_id =
-            "robot_front_laser_base_link"; // Source frame (replace with your
-                                           // robot's frame)
-        cart_transform.child_frame_id = "cart_frame"; // Target frame
-        cart_transform.transform.translation.x = center_x;
-        cart_transform.transform.translation.y = center_y;
-        cart_transform.transform.translation.z =
-            0.0; // Assuming shelf height is at the same height as the robot's
-                 // base
-        cart_transform.transform.rotation.x = 0.0;
-        cart_transform.transform.rotation.y = 0.0;
-        cart_transform.transform.rotation.z = 0.0;
-        cart_transform.transform.rotation.w = 1.0;
-        tf_broadcaster_->sendTransform(cart_transform);
 
         // Calculate the distance to move forward to be right underneath the
         // shelf

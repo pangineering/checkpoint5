@@ -50,6 +50,7 @@ ament_target_dependencies(approach_service_server
   std_srvs
   tf2_ros
   tf2
+  nav_msgs
 )
 
 # Link against the typesupport library
