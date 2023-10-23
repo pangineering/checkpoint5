@@ -60,28 +60,19 @@ private:
       // Obstacle detected, switch to aligning_to_shelf_ mode
       aligning_to_shelf_ = true;
       stop_rotation_ = true; // Stop rotating
-      RCLCPP_INFO(this->get_logger(), "Task Done: %s",
-                  task_done_ ? "true" : "false");
+
       // Stop the robot and align to the shelf
       stopRobot();
       alignToShelf();
-      RCLCPP_INFO(this->get_logger(), "Task Done: %s",
-                  task_done_ ? "true" : "false");
-
     } else if (aligning_to_shelf_ &&
                std::abs(yaw_ - degrees_in_radians) > 0.05) {
       // Continue aligning to the shelf until the desired angle is reached
       RCLCPP_INFO(this->get_logger(), "Degree angle: %f", degrees_);
       alignToShelf();
-      RCLCPP_INFO(this->get_logger(), "Task Done: %s",
-                  task_done_ ? "true" : "false");
     } else if (!stop_rotation_ && !task_done_) {
-      // If the robot is not already stopped and not aligning to the shelf,
-      // move it forward
+      // If the robot is not already stopped and not aligning to the shelf, move
+      // it forward
       moveRobotForward();
-    } else if (task_done_) {
-      RCLCPP_INFO(this->get_logger(), "Task Done: %s", "true");
-      stopRobot();
     }
   }
 
@@ -142,16 +133,12 @@ private:
     double angle_difference = std::abs(yaw_ - degrees_in_radians);
     RCLCPP_INFO(this->get_logger(), "difference angle: %f", angle_difference);
 
-    if (angle_difference > 0.058) {
+    if (angle_difference > 0.05) {
       // Continue rotating towards the desired angle
-      twist.angular.z = (degrees_in_radians > yaw_) ? 0.1 : -0.1;
+      twist.angular.z = (degrees_in_radians > yaw_) ? 0.2 : -0.2;
     } else {
       // If the desired angle is reached (within a tolerance), stop rotation
       twist.angular.z = 0.0;
-      RCLCPP_INFO(
-          this->get_logger(),
-          "the desired angle is reached (within a tolerance), stop rotation");
-
       aligning_to_shelf_ = false;
       stop_rotation_ = false;
       task_done_ = true;
@@ -173,6 +160,7 @@ private:
   double yaw_;
   rclcpp::TimerBase::SharedPtr timer_;
 };
+
 
 int main(int argc, char **argv) {
   rclcpp::init(argc, argv);
