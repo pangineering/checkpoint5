@@ -92,10 +92,12 @@ private:
         // Calculate the distance to move forward to be right underneath the
         // shelf
         double forward_distance = 0.3; // 30 cm
+        // Move the robot forward while maintaining the adjusted orientation
 
         // Perform the robot's movement based on the transformation
-        bool movement_successful =
-            moveTowardsTransform(center_x, center_y, forward_distance);
+        bool movement_successful = moveTowardsTransform(
+            cart_transform.transform.translation.x,
+            cart_transform.transform.translation.y, forward_distance);
 
         if (movement_successful) {
           response->complete = true;
@@ -132,45 +134,30 @@ private:
     double angle_to_target = atan2(target_y - robot_y_, target_x - robot_x_);
 
     double total_distance = distance_to_target + forward_distance;
+    // Print the remaining distance to the target
+    RCLCPP_INFO(this->get_logger(), "Remaining distance to target: %.2f meters",
+                distance_to_target);
 
     // Adjust the robot's orientation towards the target (e.g., turn the robot)
     // Implement your robot's control mechanisms to adjust its orientation
 
     // Move the robot forward while maintaining the adjusted orientation
     geometry_msgs::msg::Twist cmd_vel_msg;
-    cmd_vel_msg.linear.x = 0.2; // Example linear velocity for forward motion
+    cmd_vel_msg.linear.x =
+        distance_to_target; // Example linear velocity for forward motion
 
     // Publish the Twist message to control the robot's movement
     cmd_vel_publisher_->publish(cmd_vel_msg);
 
     // Move the robot until it reaches the target position
-    while (distance_to_target > 0) {
-      // Calculate the distance to move in this step (up to a maximum of
-      // distance_to_target)
-      double step_distance =
-          std::min(0.1, distance_to_target); // Adjust step distance as needed
 
-      // Move the robot forward while maintaining the adjusted orientation
-      geometry_msgs::msg::Twist cmd_vel_msg;
-      cmd_vel_msg.linear.x = 0.2;  // Example linear velocity for forward motion
-      cmd_vel_msg.angular.z = 0.0; // Example angular velocity (no rotation)
-
-      // Publish the Twist message to control the robot's movement
-      cmd_vel_publisher_->publish(cmd_vel_msg);
-
-      // Update the remaining distance to the target
-      distance_to_target -= step_distance;
-
-      // Sleep for a short duration (you may need to adjust this)
-      rclcpp::sleep_for(
-          std::chrono::milliseconds(100)); // Example sleep duration
-    }
+    RCLCPP_INFO(this->get_logger(), "Done");
 
     // Now the robot has reached the target position
     // Stop the robot
-    cmd_vel_msg.linear.x = 0.0;
-    cmd_vel_msg.angular.z = 0.0;
-    cmd_vel_publisher_->publish(cmd_vel_msg);
+   // cmd_vel_msg.linear.x = 0.0;
+   // cmd_vel_msg.angular.z = 0.0;
+   // cmd_vel_publisher_->publish(cmd_vel_msg);
 
     // Update the robot's position
     robot_x_ = target_x;
@@ -182,13 +169,14 @@ private:
     while (forward_distance > 0) {
       // Calculate the distance to move in this step (up to a maximum of
       // forward_distance)
+      RCLCPP_INFO(this->get_logger(), "Moving Further");
       double step_distance =
-          std::min(0.1, forward_distance); // Adjust step distance as needed
+          std::min(0.2, forward_distance); // Adjust step distance as needed
 
       // Move the robot forward while maintaining the adjusted orientation
       geometry_msgs::msg::Twist forward_cmd_vel_msg;
       forward_cmd_vel_msg.linear.x =
-          0.2; // Example linear velocity for forward motion
+          distance_to_target; // Example linear velocity for forward motion
       forward_cmd_vel_msg.angular.z =
           0.0; // Example angular velocity (no rotation)
 
@@ -202,6 +190,7 @@ private:
       rclcpp::sleep_for(
           std::chrono::milliseconds(100)); // Example sleep duration
     }
+    RCLCPP_INFO(this->get_logger(), "Done");
 
     // Stop the robot after moving forward by the desired distance
     geometry_msgs::msg::Twist stop_cmd_vel_msg;
